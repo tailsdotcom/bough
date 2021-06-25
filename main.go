@@ -3,22 +3,31 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v35/github"
 	"golang.org/x/oauth2"
 )
 
 var (
-	source = flag.String("source", "master", "Base reference to copy.")
+	source = flag.String("source", "", "Base reference to copy.")
 )
 
+func myUsage() {
+	fmt.Printf("Usage: %s [OPTION]... owner/repository branch:\n", os.Args[0])
+	flag.PrintDefaults()
+	os.Exit(1)
+}
+
 func main() {
+	flag.Usage = myUsage
 	flag.Parse()
 	if flag.NArg() != 2 {
-		log.Fatalf("Please supply repository and destination.")
+		flag.Usage()
 	}
 	ownerRepo := strings.Split(flag.Arg(0), "/")
 	if len(ownerRepo) != 2 {
@@ -32,13 +41,20 @@ func main() {
 	if token == "" {
 		log.Fatalf("Please set GITHUB_TOKEN.")
 	}
-
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: token},
 	)
 	tc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(tc)
+
+	if *source == "" {
+		rep, _, err := client.Repositories.Get(ctx, owner, repo)
+		if err != nil {
+			log.Fatalf("Unable to find repository, %v", err)
+		}
+		source = rep.DefaultBranch
+	}
 
 	baseRef, _, err := client.Git.GetRef(ctx, owner, repo, "refs/heads/"+*source)
 	if err != nil {
@@ -51,4 +67,30 @@ func main() {
 		log.Fatalf("Cannot create branch, %v", err)
 	}
 
+	pending := true
+	for pending {
+		time.Sleep(20 * time.Second)
+		pending = false
+		builds := make(map[string]bool)
+		statuses, _, err := client.Repositories.ListStatuses(ctx, owner, repo, *baseRef.Object.SHA, &github.ListOptions{})
+		if err != nil {
+			log.Fatalf("Cannot get statuses, %v", err)
+		}
+		for _, status := range statuses {
+			switch *status.State {
+			case "pending":
+				builds[*status.TargetURL] = builds[*status.TargetURL] || false
+			case "success":
+				builds[*status.TargetURL] = builds[*status.TargetURL] || true
+			default:
+				log.Fatalf("%s: %s %s", *status.State, *status.Description, *status.TargetURL)
+			}
+		}
+		for k, v := range builds {
+			if !v {
+				log.Printf("Pending: %s", k)
+				pending = true
+			}
+		}
+	}
 }
