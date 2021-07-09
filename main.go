@@ -13,8 +13,20 @@ import (
 	"golang.org/x/oauth2"
 )
 
+type repeatedFlag map[string]bool
+
+func (i repeatedFlag) String() string {
+	return "my string representation"
+}
+
+func (i repeatedFlag) Set(value string) error {
+	i[value] = true
+	return nil
+}
+
 var (
 	source = flag.String("source", "", "Base reference to copy.")
+	ignore = make(repeatedFlag)
 )
 
 func myUsage() {
@@ -25,6 +37,7 @@ func myUsage() {
 
 func main() {
 	flag.Usage = myUsage
+	flag.Var(&ignore, "ignore", "Contexts to ignore.")
 	flag.Parse()
 	if flag.NArg() != 2 {
 		flag.Usage()
@@ -77,6 +90,9 @@ func main() {
 			log.Fatalf("Cannot get statuses, %v", err)
 		}
 		for _, status := range statuses {
+			if ignore[*status.Context] {
+				continue
+			}
 			switch *status.State {
 			case "pending":
 				builds[*status.TargetURL] = builds[*status.TargetURL] || false
