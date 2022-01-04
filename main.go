@@ -25,8 +25,9 @@ func (i repeatedFlag) Set(value string) error {
 }
 
 var (
-	source = flag.String("source", "", "Base reference to copy.")
-	ignore = make(repeatedFlag)
+	source  = flag.String("source", "", "Base reference to copy.")
+	message = flag.String("message", "", "Generate an empty commit in new branch with this message.")
+	ignore  = make(repeatedFlag)
 )
 
 func myUsage() {
@@ -73,8 +74,25 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to get base reference, %v", err)
 	}
+	baseObject := baseRef.Object
 
-	newRef := &github.Reference{Ref: github.String("refs/heads/" + destination), Object: &github.GitObject{SHA: baseRef.Object.SHA}}
+	if *message != "" {
+		baseCommit, _, err := client.Git.GetCommit(ctx, owner, repo, *baseObject.SHA)
+		if err != nil {
+			log.Fatalf("Unable to get base commit, %v", err)
+		}
+		newCommit, _, err := client.Git.CreateCommit(ctx, owner, repo, &github.Commit{
+			Tree:    baseCommit.Tree,
+			Message: message,
+			Parents: []*github.Commit{baseCommit},
+		})
+		if err != nil {
+			log.Fatalf("Cannot create commit, %v", err)
+		}
+		baseObject = &github.GitObject{SHA: newCommit.SHA}
+	}
+
+	newRef := &github.Reference{Ref: github.String("refs/heads/" + destination), Object: baseObject}
 	_, _, err = client.Git.CreateRef(ctx, owner, repo, newRef)
 	if err != nil {
 		log.Fatalf("Cannot create branch, %v", err)
