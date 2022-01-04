@@ -103,7 +103,7 @@ func main() {
 		time.Sleep(20 * time.Second)
 		pending = false
 		builds := make(map[string]bool)
-		statuses, _, err := client.Repositories.ListStatuses(ctx, owner, repo, *baseRef.Object.SHA, &github.ListOptions{})
+		statuses, _, err := client.Repositories.ListStatuses(ctx, owner, repo, *baseObject.SHA, &github.ListOptions{})
 		if err != nil {
 			log.Fatalf("Cannot get statuses, %v", err)
 		}
