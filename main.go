@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v35/github"
+	"github.com/google/go-github/v45/github"
 	"golang.org/x/oauth2"
 )
 
@@ -118,6 +118,25 @@ func main() {
 				builds[*status.TargetURL] = builds[*status.TargetURL] || true
 			default:
 				log.Fatalf("%s: %s %s", *status.State, *status.Description, *status.TargetURL)
+			}
+		}
+		checkRuns, _, err := client.Checks.ListCheckRunsForRef(ctx, owner, repo, *baseObject.SHA, &github.ListCheckRunsOptions{})
+		if err != nil {
+			log.Fatalf("Cannot get check runs, %v", err)
+		}
+		for _, checkRun := range checkRuns.CheckRuns {
+			if ignore[*checkRun.Name] {
+				continue
+			}
+			switch *checkRun.Status {
+			case "queued":
+				builds[*checkRun.URL] = builds[*checkRun.URL] || false
+			case "in_progress":
+				builds[*checkRun.URL] = builds[*checkRun.URL] || false
+			case "completed":
+				builds[*checkRun.URL] = builds[*checkRun.URL] || true
+			default:
+				log.Fatalf("%s: %s %s", *checkRun.Status, *checkRun.Name, *checkRun.URL)
 			}
 		}
 		for k, v := range builds {
