@@ -115,7 +115,7 @@ func main() {
 			case "pending":
 				builds[*status.TargetURL] = builds[*status.TargetURL] || false
 			case "success":
-				builds[*status.TargetURL] = builds[*status.TargetURL] || true
+				builds[*status.TargetURL] = true
 			default:
 				log.Fatalf("%s: %s %s", *status.State, *status.Description, *status.TargetURL)
 			}
@@ -130,11 +130,11 @@ func main() {
 			}
 			switch *checkRun.Status {
 			case "queued":
-				builds[*checkRun.URL] = builds[*checkRun.URL] || false
+				builds[*checkRun.HTMLURL] = false
 			case "in_progress":
-				builds[*checkRun.URL] = builds[*checkRun.URL] || false
+				builds[*checkRun.HTMLURL] = false
 			case "completed":
-				builds[*checkRun.URL] = builds[*checkRun.URL] || true
+				builds[*checkRun.HTMLURL] = true
 			default:
 				log.Fatalf("%s: %s %s", *checkRun.Status, *checkRun.Name, *checkRun.URL)
 			}
